@@ -1,17 +1,17 @@
 model Agent {
-    id          String    @id @default(cuid())
-    name        String    @map("name") @db.VarChar(255)
-    description String    @map("description") @db.Text
-    createdAt   DateTime  @default(now()) @map("created_at")
-    updatedAt   DateTime  @updatedAt @map("updated_at")
-    deletedAt   DateTime? @map("deleted_at")
-    userId      String    @map("user_id")
+    id          String @id @default(cuid()) /// 아이디
+    name        String @map("name") @db.VarChar(255) /// 이름
+    description String @map("description") @db.Text /// 설명
+    task        String @map("task") @db.Text /// 작업
 
-    creator   User @relation("agent_creator", fields: [creatorId], references: [id])
-    creatorId Int  @map("creator_id")
+    creator   User @relation("agent_creator", fields: [creatorId], references: [id]) /// 생성자
+    creatorId Int  @map("creator_id") /// 생성자 아이디
+
+    createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3) /// 생성일
+    updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamptz(3) /// 수정일
+    deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3) /// 삭제일
 
     @@index([name], map: "idx_agent_name")
     @@index([deletedAt], map: "idx_agent_deleted_at")
-    @@index([userId], map: "idx_agent_user_id")
     @@map("agent")
 }

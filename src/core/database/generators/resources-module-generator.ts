@@ -34,17 +34,31 @@ function fileExists(filePath: string): boolean {
     }
 }
 
+function readFileSafe(filePath: string): string {
+    try {
+        return fs.readFileSync(filePath, 'utf8');
+    } catch {
+        return '';
+    }
+}
+
+function isLegacySwaggerModelFile(filePath: string): boolean {
+    const content = readFileSafe(filePath);
+    return content.includes(`from '@nestjs/swagger';`) && content.includes('ApiProperty');
+}
+
 generatorHandler({
-    onGenerate: async (options: GeneratorOptions) => {
+    onGenerate: async (options: GeneratorOptions): Promise<void> => {
         // 캐시 초기화
         createdDirs.clear();
 
-        const output = options.generator.output?.value;
-        if (!output) throw new Error('리소스 모듈 제너레이터 output이 정의되지 않았습니다.');
-
         // prisma generate는 프로젝트 루트에서 실행되므로 cwd 기준으로 검색
         const projectRoot = process.cwd();
-        const searchRoot = path.join(projectRoot, 'src', '_resources');
+        // schema.prisma의 generator 설정(config)으로 검색 루트를 오버라이드 가능
+        // 기본값은 실제 리소스가 위치한 src/resources
+        const searchRoot =
+            (options.generator.config?.searchRoot as string | undefined) ??
+            path.join(projectRoot, 'src', 'resources');
 
         const models = options.dmmf.datamodel.models;
         const enums = options.dmmf.datamodel.enums.map(v => ({
@@ -68,33 +82,21 @@ generatorHandler({
             const dir = path.dirname(schemaPath);
             const moduleFilePath = path.join(dir, `${kebabName}.module.ts`);
 
-            // Info 모델과 일반 모델의 경로 구분
-            const isInfoModel = model.name.startsWith('Info');
-            const modelFilePath = isInfoModel
-                ? path.join(dir, `${kebabName}.model.ts`)
-                : path.join(dir, 'models', `${kebabName}.model.ts`);
-            const operationModelFilePath = path.join(dir, 'models', `${kebabName}.operation.model.ts`);
+            const modelFilePath = path.join(dir, 'models', `${kebabName}.model.ts`);
 
             // 모듈이 이미 존재하는 경우
             if (fileExists(moduleFilePath)) {
                 console.log(`🔍 모델 파일 확인 중: ${modelFilePath}`);
                 console.log(`🔍 모델 파일 존재 여부: ${fileExists(modelFilePath)}`);
 
-                // 모델 파일이 없으면 생성
-                if (!fileExists(modelFilePath)) {
-                    console.log(`✓ 모듈 ${model.name} 존재, 누락된 모델 파일 생성 중...`);
-                    console.log(`📁 필요한 디렉터리 생성 중...`);
+                const shouldRegenModels =
+                    !fileExists(modelFilePath) || isLegacySwaggerModelFile(modelFilePath);
 
-                    // 필요한 디렉토리 생성
-                    if (!isInfoModel) {
-                        const modelsDir = path.join(dir, 'models');
-                        console.log(`📁 models 디렉터리 생성 중: ${modelsDir}`);
-                        ensureDir(modelsDir);
-                    }
-
-                    console.log(`🛠️  generateModelFiles 호출 중...`);
+                if (shouldRegenModels) {
+                    console.log(`✓ 모듈 ${model.name} 존재, 모델 포맷 정합성 맞추는 중...`);
+                    const modelsDir = path.join(dir, 'models');
+                    ensureDir(modelsDir);
                     generateModelFiles(model, enums, dir, kebabName, upperName);
-                    console.log(`✅ 모델 파일 생성 완료`);
                 } else {
                     console.log(`✓ 모듈 ${model.name} 이미 존재, 건너뜀...`);
                 }
@@ -103,30 +105,12 @@ generatorHandler({
 
             console.log(`📦 ${model.name} 모듈 생성 중...`);
 
-            // 필요한 디렉토리들을 한 번에 생성
-            const dirsToCreate = [
-                path.join(dir, 'dto', 'response'),
-                path.join(dir, 'controllers'),
-                path.join(dir, 'adapters'),
-            ];
-
-            // Info 모델이 아닌 경우만 models 폴더 추가
-            if (!model.name.startsWith('Info')) {
-                dirsToCreate.push(path.join(dir, 'models'));
-                dirsToCreate.push(path.join(dir, 'relations'));
-            }
+            // agent 포맷: dto, controllers, models 만 생성
+            const dirsToCreate = [path.join(dir, 'dto'), path.join(dir, 'controllers'), path.join(dir, 'models')];
 
             // 디렉토리 생성
             for (const dirPath of dirsToCreate) {
                 ensureDir(dirPath);
-            }
-
-            // relations 폴더에 rel.prisma 파일 생성 (Info 모델이 아닌 경우)
-            if (!model.name.startsWith('Info')) {
-                const relPrismaPath = path.join(dir, 'relations', 'rel.prisma');
-                if (!fileExists(relPrismaPath)) {
-                    fs.writeFileSync(relPrismaPath, `// ${model.name} 관계\n`);
-                }
             }
 
             // 모델 파일 생성
@@ -146,182 +130,142 @@ generatorHandler({
  * 모델 관련 파일들을 생성합니다
  */
 function generateModelFiles(model: any, enums: any[], dir: string, kebabName: string, upperName: string): void {
-    // Import map 설정
-    const modelImportMap: DatabaseGeneratorImportMap = new Map();
+    const modelFilePath = path.join(dir, 'models', `${kebabName}.model.ts`);
 
-    DatabaseGeneratorUtils.registerByImport(modelImportMap, MAP_KEY.PRISMA, '@prisma/client');
-    DatabaseGeneratorUtils.registerByImport(modelImportMap, MAP_KEY.CLASS_VALIDATOR, 'class-validator');
-    DatabaseGeneratorUtils.registerByImport(modelImportMap, MAP_KEY.CLASS_TRANSFORM, 'class-transformer', ['Type']);
-    DatabaseGeneratorUtils.registerByImport(
-        modelImportMap,
-        MAP_KEY.IS_BOOLEAN_FN,
-        '@common/decorators/is-boolean.decorator',
-    );
-    DatabaseGeneratorUtils.registerByImport(
-        modelImportMap,
-        MAP_KEY.EXCLUDE_ENUM_VALUE_FN,
-        '@common/functions/exclude-enum-value',
-    );
-    DatabaseGeneratorUtils.registerByImport(
-        modelImportMap,
-        MAP_KEY.PRISMA_DECIMAL,
-        '@core/database/decorators/prisma-decimal',
-    );
-    DatabaseGeneratorUtils.registerByImport(
-        modelImportMap,
-        MAP_KEY.PRISMA_BIGINT,
-        '@core/database/decorators/prisma-bigint',
-    );
-
-    // includeRelations를 false로 설정하여 관계 필드 제외
-    const modelProperties = DatabaseGeneratorUtils.getModelProperties(model, enums, modelImportMap, false, false);
-    const modelImportValues = DatabaseGeneratorUtils.getImportValues(modelImportMap);
-
-    // 관계 필드는 모델에 포함하지 않으므로 import도 필요 없음
-
-    // Info 모델과 일반 모델의 경로 구분
-    const isInfoModel = model.name.startsWith('Info');
-    const modelFilePath = isInfoModel
-        ? path.join(dir, `${kebabName}.model.ts`)
-        : path.join(dir, 'models', `${kebabName}.model.ts`);
+    const { prismaImports, propertyValues } = buildUserStyleModel(model, enums);
 
     // Model 파일 생성
     console.log(`📝 모델 파일 생성 중: ${modelFilePath}`);
-    fs.writeFileSync(modelFilePath, template.model(model.name, modelImportValues, modelProperties));
+    fs.writeFileSync(modelFilePath, template.model(model.name, prismaImports, propertyValues));
     console.log(`✅ 모델 파일 생성 완료`);
 
-    // OperationModel 파일은 Info 모델이 아닌 경우에만 생성
-    if (!isInfoModel) {
-        const operationModelPath = path.join(dir, 'models', `${kebabName}.operation.model.ts`);
-        console.log(`📝 operation 모델 파일 생성 중: ${operationModelPath}`);
-        fs.writeFileSync(operationModelPath, template.operationModel(model.name, kebabName, upperName));
-        console.log(`✅ operation 모델 파일 생성 완료`);
-    }
+    const operationModelPath = path.join(dir, 'models', `${kebabName}.operation.model.ts`);
+    console.log(`📝 operation 모델 파일 생성 중: ${operationModelPath}`);
+    fs.writeFileSync(operationModelPath, template.operationModel(model.name, kebabName, upperName));
+    console.log(`✅ operation 모델 파일 생성 완료`);
 }
 
-/**
- * relations 폴더에서 하위 모듈을 찾습니다
- */
-function findRelationModules(dir: string): { name: string; folder: string }[] {
-    const relationsDir = path.join(dir, 'relations');
-    const relationModules: { name: string; folder: string }[] = [];
+function buildUserStyleModel(model: any, enums: any[]): { prismaImports: string[]; propertyValues: string } {
+    const excluded = new Set(['createdAt', 'updatedAt', 'deletedAt']);
 
-    if (fs.existsSync(relationsDir)) {
-        const entries = fs.readdirSync(relationsDir, { withFileTypes: true });
-        for (const entry of entries) {
-            if (entry.isDirectory()) {
-                const relationPath = path.join(relationsDir, entry.name);
-                // 폴더 내에 .prisma 파일이 있는지 확인
-                const prismaFiles = fs.readdirSync(relationPath).filter(f => f.endsWith('.prisma'));
-                if (prismaFiles.length > 0) {
-                    // prisma 파일명에서 모델명 추출 (예: test-comment.prisma -> TestComment)
-                    const modelName = prismaFiles[0].replace('.prisma', '');
-                    const pascalName = DatabaseGeneratorUtils.camelToPascalCase(
-                        modelName
-                            .split('-')
-                            .map((part, index) => (index === 0 ? part : part.charAt(0).toUpperCase() + part.slice(1)))
-                            .join(''),
-                    );
-                    relationModules.push({
-                        name: pascalName,
-                        folder: entry.name,
-                    });
-                }
+    const prismaImports = new Set<string>([model.name]);
+    const lines: string[] = [];
+
+    const scalarOrEnumFields = (model.fields ?? [])
+        .filter((f: any) => ['scalar', 'enum'].includes(f.kind))
+        .filter((f: any) => !excluded.has(f.name));
+
+    for (const field of scalarOrEnumFields) {
+        const isNullable = !field.isRequired;
+        const desc = (field.documentation ?? field.name).toString().replace(/'/g, "\\'");
+
+        // ts type + Property 옵션
+        let tsType = 'unknown';
+        let propertyDecorator = `@Property({ description: '${desc}', type: String, nullable: ${isNullable} })`;
+
+        if (field.kind === 'enum') {
+            prismaImports.add(field.type);
+            tsType = field.type;
+            propertyDecorator = `@Property({ description: '${desc}', enum: ${field.type}, nullable: ${isNullable} })`;
+        } else {
+            switch (field.type) {
+                case 'String':
+                    tsType = 'string';
+                    propertyDecorator = `@Property({ description: '${desc}', type: String, nullable: ${isNullable} })`;
+                    break;
+                case 'Int':
+                case 'Float':
+                    tsType = 'number';
+                    propertyDecorator = `@Property({ description: '${desc}', type: Number, nullable: ${isNullable} })`;
+                    break;
+                case 'Boolean':
+                    tsType = 'boolean';
+                    propertyDecorator = `@Property({ description: '${desc}', type: Boolean, nullable: ${isNullable} })`;
+                    break;
+                case 'DateTime':
+                    tsType = 'Date';
+                    propertyDecorator = `@Property({ description: '${desc}', type: Date, nullable: ${isNullable} })`;
+                    break;
+                case 'BigInt':
+                    tsType = 'bigint';
+                    propertyDecorator = `@Property({ description: '${desc}', type: String, nullable: ${isNullable} })`;
+                    break;
+                case 'Decimal':
+                    // 프로젝트 내에서 Decimal을 모델에 노출하는 방식이 애매하므로 string으로 표현(필요시 조정 가능)
+                    tsType = 'string';
+                    propertyDecorator = `@Property({ description: '${desc}', type: String, nullable: ${isNullable} })`;
+                    break;
+                default:
+                    tsType = 'unknown';
+                    propertyDecorator = `@Property({ description: '${desc}', type: String, nullable: ${isNullable} })`;
+                    break;
             }
         }
+
+        const typeSuffix = isNullable ? ' | null' : '';
+        lines.push(`    ${propertyDecorator}`);
+        lines.push(`    ${field.name}: ${tsType}${typeSuffix};`);
+        lines.push('');
     }
 
-    return relationModules;
+    // 마지막 공백 라인 제거
+    while (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
+
+    return {
+        prismaImports: [...prismaImports],
+        propertyValues: lines.join('\n'),
+    };
+}
+
+function buildCreateDtoFields(model: any): { pick: string[]; optional: string[] } {
+    const excluded = new Set(['id', 'createdAt', 'updatedAt', 'deletedAt']);
+    const scalarOrEnumFields = (model.fields ?? [])
+        .filter((f: any) => ['scalar', 'enum'].includes(f.kind))
+        .filter((f: any) => !excluded.has(f.name));
+
+    const pick: string[] = [];
+    const optional: string[] = [];
+
+    for (const field of scalarOrEnumFields) {
+        const lit = `'${field.name}'`;
+        if (field.isRequired) pick.push(lit);
+        else optional.push(lit);
+    }
+
+    return { pick, optional };
 }
 
 /**
  * 모듈 관련 파일들을 생성합니다
  */
 function generateModuleFiles(model: any, dir: string, kebabName: string, upperName: string, camelName: string): void {
-    // relations 폴더에서 하위 모듈 찾기
-    const relationModules = findRelationModules(dir);
+    const { pick, optional } = buildCreateDtoFields(model);
 
     // 생성할 파일 목록
     const files = [
-        // 모듈 파일
         {
             path: path.join(dir, `${kebabName}.module.ts`),
-            content: template.module(model.name, kebabName, relationModules),
-        },
-        // 컨트롤러 파일들
-        {
-            path: path.join(dir, 'controllers', `${kebabName}.mgmt.controller.ts`),
-            content: template.controller(model.name, kebabName, upperName, 'Mgmt', 'mgmt', model),
+            content: template.module(model.name, kebabName),
         },
         {
-            path: path.join(dir, 'controllers', `${kebabName}.public.controller.ts`),
-            content: template.controller(model.name, kebabName, upperName, 'Public', 'public', model),
+            path: path.join(dir, 'controllers', `${kebabName}.controller.ts`),
+            content: template.controller(model.name, kebabName, upperName),
         },
-        // 어댑터 파일들
-        {
-            path: path.join(dir, 'adapters', `${kebabName}.mgmt.adapter.ts`),
-            content: template.adapter(model.name, kebabName, upperName, 'Mgmt', 'mgmt', model),
-        },
-        {
-            path: path.join(dir, 'adapters', `${kebabName}.public.adapter.ts`),
-            content: template.adapter(model.name, kebabName, upperName, 'Public', 'public', model),
-        },
-        // 서비스 파일
         {
             path: path.join(dir, `${kebabName}.service.ts`),
-            content: template.service(model.name, kebabName, upperName),
+            content: template.service(model.name, kebabName),
         },
-        // 리포지토리 파일
         {
             path: path.join(dir, `${kebabName}.repository.ts`),
             content: template.repository(model.name, kebabName, camelName),
         },
-        // 상수 파일
         {
-            path: path.join(dir, `${kebabName}.constant.ts`),
-            content: template.constant(upperName, kebabName, model.documentation),
-        },
-        // DTO 파일들
-        {
-            path: path.join(dir, 'dto', `${kebabName}.mgmt.create.dto.ts`),
-            content: template.reqDto(model.name, kebabName, 'Mgmt', 'Create', false, true, model),
+            path: path.join(dir, `${kebabName}.constants.ts`),
+            content: template.constants(model.name, upperName),
         },
         {
-            path: path.join(dir, 'dto', `${kebabName}.mgmt.update.dto.ts`),
-            content: template.reqDto(model.name, kebabName, 'Mgmt', 'Update', false, true, model),
-        },
-        {
-            path: path.join(dir, 'dto', `${kebabName}.mgmt.find-list.dto.ts`),
-            content: template.reqDto(model.name, kebabName, 'Mgmt', 'FindList', true, true, model),
-        },
-        {
-            path: path.join(dir, 'dto', `${kebabName}.public.create.dto.ts`),
-            content: template.reqDto(model.name, kebabName, 'Public', 'Create', false, true, model),
-        },
-        {
-            path: path.join(dir, 'dto', `${kebabName}.public.update.dto.ts`),
-            content: template.reqDto(model.name, kebabName, 'Public', 'Update', false, true, model),
-        },
-        {
-            path: path.join(dir, 'dto', `${kebabName}.public.find-list.dto.ts`),
-            content: template.reqDto(model.name, kebabName, 'Public', 'FindList', true, true, model),
-        },
-        // Response DTO 파일들
-        {
-            path: path.join(dir, 'dto', 'response', `${kebabName}.mgmt.find-unique.response.dto.ts`),
-            content: template.resDto(model.name, kebabName, 'Mgmt', 'FindUnique', false, false, model),
-        },
-        {
-            path: path.join(dir, 'dto', 'response', `${kebabName}.mgmt.find-list.response.dto.ts`),
-            content: template.resDto(model.name, kebabName, 'Mgmt', 'FindList', true, true, model),
-        },
-        {
-            path: path.join(dir, 'dto', 'response', `${kebabName}.public.find-unique.response.dto.ts`),
-            content: template.resDto(model.name, kebabName, 'Public', 'FindUnique', false, false, model),
-        },
-        {
-            path: path.join(dir, 'dto', 'response', `${kebabName}.public.find-list.response.dto.ts`),
-            content: template.resDto(model.name, kebabName, 'Public', 'FindList', true, true, model),
+            path: path.join(dir, 'dto', `${kebabName}.create.dto.ts`),
+            content: template.createDto(model.name, kebabName, pick, optional),
         },
     ];
 

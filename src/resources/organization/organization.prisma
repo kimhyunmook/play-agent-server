@@ -1,0 +1,14 @@
+model Organization {
+    id          String       @id @default(cuid()) /// 아이디
+    name        String       @map("name") @db.VarChar(255) /// 이름
+    description String       @map("description") @db.Text /// 설명
+    departments Department[] /// 부서
+
+    createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3) /// 생성일
+    updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamptz(3) /// 수정일
+    deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3) /// 삭제일
+
+    @@index([name], map: "idx_organization_name")
+    @@index([deletedAt], map: "idx_organization_deleted_at")
+    @@map("organization")
+}

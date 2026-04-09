@@ -12,7 +12,7 @@ export interface DatabaseGeneratorModel {
     readonly uniqueFields: ReadonlyArray<ReadonlyArray<string>>; // 유니크 필드 조합
     readonly uniqueIndexes: ReadonlyArray<DMMF.uniqueIndex>; // 유니크 인덱스
     readonly documentation?: string; // 모델 설명
-    readonly primaryKey: DMMF.PrimaryKey | null; // 기본키
+    readonly primaryKey: DMMF.Model['primaryKey'] | null; // 기본키
     readonly isGenerated?: boolean; // 자동 생성 여부
 }
 

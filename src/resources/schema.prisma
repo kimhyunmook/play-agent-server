@@ -8,3 +8,8 @@ generator client {
 datasource db {
     provider = "postgresql"
 }
+
+generator resource {
+  provider = "ts-node src/core/database/generators/resources-module-generator.ts"
+  output   = ""
+}
