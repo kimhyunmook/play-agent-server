@@ -1,0 +1,17 @@
+model Agent {
+    id          String    @id @default(cuid())
+    name        String    @map("name") @db.VarChar(255)
+    description String    @map("description") @db.Text
+    createdAt   DateTime  @default(now()) @map("created_at")
+    updatedAt   DateTime  @updatedAt @map("updated_at")
+    deletedAt   DateTime? @map("deleted_at")
+    userId      String    @map("user_id")
+
+    creator   User @relation("agent_creator", fields: [creatorId], references: [id])
+    creatorId Int  @map("creator_id")
+
+    @@index([name], map: "idx_agent_name")
+    @@index([deletedAt], map: "idx_agent_deleted_at")
+    @@index([userId], map: "idx_agent_user_id")
+    @@map("agent")
+}

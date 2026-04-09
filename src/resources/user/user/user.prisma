@@ -10,6 +10,8 @@ model User {
   deletedAt   DateTime?    @map("deleted_at") @db.Timestamptz(3) ///삭제일
   userAccount UserAccount? /// 유저 계정 정보
 
+  createdAgents Agent[] @relation("agent_creator") /// 생성한 에이전트
+
   @@index([name], map: "idx_user_name")
   @@index([email], map: "idx_user_email")
   @@index([deletedAt], map: "idx_user_deleted_at")
