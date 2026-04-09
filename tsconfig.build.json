@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json",
+  "exclude": [
+    "node_modules",
+    "test",
+    "dist",
+    "**/*spec.ts",
+    "src/core/auth/**",
+    "src/core/aws-s3/**",
+    "src/core/database/**",
+    "src/common/guards/**",
+    "src/common/decorators/auth-roles.decorator.ts",
+    "src/common/decorators/role-guard.decorator.ts",
+    "src/common/interface/accout.interface.ts"
+  ]
+}

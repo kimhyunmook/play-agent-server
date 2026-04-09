@@ -1,0 +1,20 @@
+// 최소 스키마: Swagger($Enums.Role) 및 예외 매퍼(Prisma 네임스페이스)용
+// 모델·마이그레이션은 이후 확장하세요.
+
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider = "postgresql"
+}
+
+enum Role {
+    ADMIN
+    USER
+}
+
+enum UserStatus {
+    ACTIVE
+    INACTIVE
+}
