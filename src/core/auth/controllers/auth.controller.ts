@@ -87,7 +87,9 @@ export class AuthController extends CommonController {
     async login(@Body() body: LoginDto, @Res({ passthrough: true }) res: Response): Promise<LoginResponseDto> {
         const tokens = await this.authService.signIn(body.loginId, body.password);
         this.authService.setAuthCookies(res, tokens);
-        return this.responseData('로그인 됐습니다.', { accessToken: tokens.accessToken });
+        return this.responseData('로그인 됐습니다.', {
+            accessToken: tokens.accessToken,
+        });
     }
 
     @Endpoint({
@@ -121,6 +123,8 @@ export class AuthController extends CommonController {
         const refreshToken = req.cookies?.refresh_token as string;
         const tokens = await this.authService.refresh(refreshToken);
         this.authService.setAuthCookies(res, tokens);
-        return this.responseData('토큰이 갱신되었습니다.', { accessToken: tokens.accessToken });
+        return this.responseData('토큰이 갱신되었습니다.', {
+            accessToken: tokens.accessToken,
+        });
     }
 }

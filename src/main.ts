@@ -18,9 +18,9 @@ if (process.env.NODE_ENV?.toLowerCase().includes('prod')) {
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import cookieParser from 'cookie-parser';
 import { WinstonLogger } from 'nest-winston';
 import * as winston from 'winston';
-import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/exceptions';
 import { AppConfigService } from './core/config/app-config.service';

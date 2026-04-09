@@ -1,6 +1,6 @@
 import { Role } from '@prisma/client';
 
-export interface AccountJwt {
-    sub: number;
-    role: Role;
+export class AccountJwt {
+  sub: number;
+  role: Role;
 }

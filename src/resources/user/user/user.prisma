@@ -1,0 +1,52 @@
+/// 유저 정보
+model User {
+  id          Int          @id @default(autoincrement()) /// 아이디
+  email       String       @unique @db.VarChar(255) /// 이메일
+  name        String?      @db.VarChar(20) /// 이름
+  profile     String?      @db.VarChar(255) /// 프로필 이미지
+  role        Role         @default(USER) /// 권한
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime?    @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt   DateTime?    @map("deleted_at") @db.Timestamptz(3) ///삭제일
+  userAccount UserAccount? /// 유저 계정 정보
+
+  @@index([name], map: "idx_user_name")
+  @@index([email], map: "idx_user_email")
+  @@index([deletedAt], map: "idx_user_deleted_at")
+  @@map("user")
+}
+
+/// 유저 계정 정보
+model UserAccount {
+  id          String       @id @default(cuid()) /// 아이디
+  userId      Int          @unique @map("user_id") /// 유저 아이디
+  status      UserStatus   @default(ACTIVE) /// 상태
+  loginId     String       @unique @map("login_id") @db.VarChar(50) /// 로그인 아이디
+  password    String       @db.VarChar(100) /// 비밀번호
+  provider    AuthProvider @default(EMAIL) /// 인증 제공자
+  providerId  String?      @map("provider_id") @db.VarChar(255) /// 인증 제공자 아이디
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade) /// 유저
+  lastLoginAt DateTime?    @map("last_login_at") @db.Timestamptz(3) /// 최근 로그인 시간
+
+  @@index([loginId], map: "idx_user_login_id")
+  @@index([userId], map: "idx_user_account_user_id")
+  @@index([status], map: "idx_user_account_status")
+  @@map("user_account")
+}
+
+enum UserStatus {
+  ACTIVE    @map("활성")
+  INACTIVE  @map("비활성")
+  SUSPENDED @map("정지")
+  BANNED    @map("차단")
+}
+
+enum Role {
+  USER  @map("유저")
+  ADMIN @map("관리자")
+}
+
+enum AuthProvider {
+  EMAIL  @map("이메일")
+  GOOGLE @map("Google")
+}

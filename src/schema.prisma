@@ -8,13 +8,3 @@ generator client {
 datasource db {
     provider = "postgresql"
 }
-
-enum Role {
-    ADMIN
-    USER
-}
-
-enum UserStatus {
-    ACTIVE
-    INACTIVE
-}

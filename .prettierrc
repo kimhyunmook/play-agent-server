@@ -1,4 +1,28 @@
 {
   "singleQuote": true,
-  "trailingComma": "all"
+  "trailingComma": "all",
+  "tabWidth": 4,
+  "bracketSpacing": true,
+  "semi": true,
+  "arrowParens": "avoid",
+  "printWidth": 120,
+  "endOfLine": "auto",
+  "quoteProps": "as-needed",
+  "bracketSameLine": false,
+  "proseWrap": "preserve",
+  "plugins": ["prettier-plugin-prisma"],
+  "overrides": [
+    {
+      "files": "*.json",
+      "options": {
+        "tabWidth": 2
+      }
+    },
+    {
+      "files": "*.prisma",
+      "options": {
+        "tabWidth": 2
+      }
+    }
+  ]
 }

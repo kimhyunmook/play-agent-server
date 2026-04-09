@@ -4,11 +4,12 @@ import 'dotenv/config';
 import { defineConfig } from 'prisma/config';
 
 export default defineConfig({
-  schema: 'src/schema.prisma',
-  migrations: {
-    path: 'migrations',
-  },
-  datasource: {
-    url: process.env['DATABASE_URL'],
-  },
+    // 디렉터리로 지정하면 그 아래의 모든 .prisma 파일이 하나의 스키마로 병합됩니다.
+    schema: 'src',
+    migrations: {
+        path: 'migrations',
+    },
+    datasource: {
+        url: process.env['DATABASE_URL'],
+    },
 });
