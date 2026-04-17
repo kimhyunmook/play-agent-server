@@ -6,6 +6,7 @@ import { buildResourceModuleTemplate } from './resources/module.template';
 import { buildResourceOperationModelTemplate } from './resources/models/operation-model.template';
 import { buildResourceRepositoryTemplate } from './resources/repository.template';
 import { buildResourceServiceTemplate } from './resources/service.template';
+import { buildResourceCreateValidatorsTemplate } from './resources/validators/create.validators.template';
 
 export class DatabaseGeneratorTemplate {
     // 모델 클래스 템플릿 생성 (user 포맷)
@@ -41,6 +42,21 @@ export class DatabaseGeneratorTemplate {
     // Create DTO 템플릿 (agent 포맷)
     public createDto(pascalName: string, kebabName: string, pick: string[], optional: string[]) {
         return buildResourceCreateDtoTemplate(pascalName, kebabName, pick, optional);
+    }
+
+    // Create validator 템플릿 (agent 포맷)
+    public createValidator(
+        pascalName: string,
+        kebabName: string,
+        destructuredFields: string[],
+        relationAssignments: string[],
+    ) {
+        return buildResourceCreateValidatorsTemplate(
+            pascalName,
+            kebabName,
+            destructuredFields,
+            relationAssignments,
+        );
     }
 
     // (기존 Mgmt/Public + DTO/Response 템플릿들은 agent 포맷에서는 사용하지 않음)

@@ -11,8 +11,10 @@ export class ${pascalName}Repository extends CommonRepository<'${camelName}'> {
         super(txHost);
     }
 
-    create(data: Prisma.${pascalName}CreateInput) {
-        return this.repository.create({ data });
+    create<T extends Prisma.${pascalName}CreateArgs>(
+        args: Prisma.SelectSubset<T, Prisma.${pascalName}CreateArgs>,
+    ): Promise<Prisma.${pascalName}GetPayload<T>> {
+        return this.repository.create(args);
     }
 }
 `;

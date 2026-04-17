@@ -105,8 +105,13 @@ generatorHandler({
 
             console.log(`📦 ${model.name} 모듈 생성 중...`);
 
-            // agent 포맷: dto, controllers, models 만 생성
-            const dirsToCreate = [path.join(dir, 'dto'), path.join(dir, 'controllers'), path.join(dir, 'models')];
+            // agent 포맷: dto, controllers, models, validators 생성
+            const dirsToCreate = [
+                path.join(dir, 'dto'),
+                path.join(dir, 'controllers'),
+                path.join(dir, 'models'),
+                path.join(dir, 'validators'),
+            ];
 
             // 디렉토리 생성
             for (const dirPath of dirsToCreate) {
@@ -235,11 +240,37 @@ function buildCreateDtoFields(model: any): { pick: string[]; optional: string[] 
     return { pick, optional };
 }
 
+function buildCreateValidatorFields(model: any): { destructuredFields: string[]; relationAssignments: string[] } {
+    const relationFields = (model.fields ?? []).filter(
+        (field: any) =>
+            field.kind === 'object' &&
+            Array.isArray(field.relationFromFields) &&
+            Array.isArray(field.relationToFields) &&
+            field.relationFromFields.length > 0 &&
+            field.relationFromFields.length === field.relationToFields.length,
+    );
+
+    const destructuredFields = [...new Set(relationFields.flatMap((field: any) => field.relationFromFields))];
+    const relationAssignments = relationFields.map((field: any) => {
+        const condition = field.relationFromFields
+            .map((localField: string) => `${localField} !== undefined && ${localField} !== null`)
+            .join(' && ');
+        const connectFields = field.relationToFields
+            .map((targetField: string, index: number) => `${targetField}: ${field.relationFromFields[index]}`)
+            .join(', ');
+
+        return `            ${field.name}: ${condition} ? { connect: { ${connectFields} } } : undefined,`;
+    });
+
+    return { destructuredFields, relationAssignments };
+}
+
 /**
  * 모듈 관련 파일들을 생성합니다
  */
 function generateModuleFiles(model: any, dir: string, kebabName: string, upperName: string, camelName: string): void {
     const { pick, optional } = buildCreateDtoFields(model);
+    const { destructuredFields, relationAssignments } = buildCreateValidatorFields(model);
 
     // 생성할 파일 목록
     const files = [
@@ -266,6 +297,10 @@ function generateModuleFiles(model: any, dir: string, kebabName: string, upperNa
         {
             path: path.join(dir, 'dto', `${kebabName}.create.dto.ts`),
             content: template.createDto(model.name, kebabName, pick, optional),
+        },
+        {
+            path: path.join(dir, 'validators', `${kebabName}.create.validators.ts`),
+            content: template.createValidator(model.name, kebabName, destructuredFields, relationAssignments),
         },
     ];
 
