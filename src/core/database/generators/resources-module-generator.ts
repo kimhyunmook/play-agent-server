@@ -241,6 +241,7 @@ function buildCreateDtoFields(model: any): { pick: string[]; optional: string[] 
 }
 
 function buildCreateValidatorFields(model: any): { destructuredFields: string[]; relationAssignments: string[] } {
+    const modelFields = model.fields ?? [];
     const relationFields = (model.fields ?? []).filter(
         (field: any) =>
             field.kind === 'object' &&
@@ -250,16 +251,28 @@ function buildCreateValidatorFields(model: any): { destructuredFields: string[];
             field.relationFromFields.length === field.relationToFields.length,
     );
 
-    const destructuredFields = [...new Set(relationFields.flatMap((field: any) => field.relationFromFields))];
-    const relationAssignments = relationFields.map((field: any) => {
-        const condition = field.relationFromFields
-            .map((localField: string) => `${localField} !== undefined && ${localField} !== null`)
-            .join(' && ');
+    const destructuredFields: string[] = [
+        ...new Set<string>(relationFields.flatMap((field: any) => field.relationFromFields as string[])),
+    ];
+    const relationAssignments: string[] = relationFields.map((field: any) => {
+        const localFields = field.relationFromFields as string[];
+        const hasOptionalLocalField = localFields.some((localField: string) => {
+            const matchedField = modelFields.find((modelField: any) => modelField.name === localField);
+            return matchedField ? !matchedField.isRequired : false;
+        });
         const connectFields = field.relationToFields
             .map((targetField: string, index: number) => `${targetField}: ${field.relationFromFields[index]}`)
             .join(', ');
 
-        return `            ${field.name}: ${condition} ? { connect: { ${connectFields} } } : undefined,`;
+        if (hasOptionalLocalField) {
+            const condition = localFields
+                .map((localField: string) => `${localField} !== undefined && ${localField} !== null`)
+                .join(' && ');
+
+            return `            ${field.name}: ${condition} ? { connect: { ${connectFields} } } : undefined,`;
+        }
+
+        return `            ${field.name}: { connect: { ${connectFields} } },`;
     });
 
     return { destructuredFields, relationAssignments };
