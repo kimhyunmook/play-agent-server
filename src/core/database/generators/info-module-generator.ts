@@ -35,7 +35,7 @@ function fileExists(filePath: string): boolean {
 }
 
 generatorHandler({
-    onGenerate: async (options: GeneratorOptions) => {
+    onGenerate: (options: GeneratorOptions) => {
         // 캐시 초기화
         createdDirs.clear();
 
@@ -98,6 +98,8 @@ generatorHandler({
         }
 
         console.log('\n✨ Info 생성 완료!\n');
+
+        return Promise.resolve();
     },
 });
 

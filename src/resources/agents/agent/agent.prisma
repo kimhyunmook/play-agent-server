@@ -1,11 +1,13 @@
 model Agent {
-    id          String @id @default(cuid()) /// 아이디
+    id        String @id @default(cuid()) /// 아이디
+    creatorId Int    @map("creator_id") /// 생성자 아이디
+
     name        String @map("name") @db.VarChar(255) /// 이름
     description String @map("description") @db.Text /// 설명
     task        String @map("task") @db.Text /// 작업
 
-    creator   User @relation("agent_creator", fields: [creatorId], references: [id]) /// 생성자
-    creatorId Int  @map("creator_id") /// 생성자 아이디
+    creator User        @relation("agent_creator", fields: [creatorId], references: [id]) /// 생성자
+    role    AgentRole[] @relation("agent_role") /// 역할
 
     createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3) /// 생성일
     updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamptz(3) /// 수정일

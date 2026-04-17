@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { PrismaTxHost, CommonRepository } from '../../common/utils/common.repository';
+import { PrismaTxHost, CommonRepository } from 'src/common/utils/common.repository';
 
 @Injectable()
 export class DepartmentRepository extends CommonRepository<'department'> {

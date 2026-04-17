@@ -1,0 +1,18 @@
+model AgentRole {
+    id          String @id @default(cuid()) /// 아이디
+    name        String @map("name") @db.VarChar(255) /// 이름
+    description String @map("description") @db.Text /// 설명
+
+    createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3) /// 생성일
+    updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamptz(3) /// 수정일
+    deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3) /// 삭제일
+
+    owner   User? @relation(fields: [ownerId], references: [id]) /// 소유자
+    ownerId Int?  @map("owner_id") /// 소유자 아이디
+
+    agents Agent[] @relation("agent_role") /// 에이전트
+
+    @@index([name], map: "idx_role_name")
+    @@index([deletedAt], map: "idx_role_deleted_at")
+    @@map("agent_role")
+}

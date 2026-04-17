@@ -10,7 +10,7 @@ import { DatabaseModule } from './core/database/database.module';
 import { DatabaseService } from './core/database/database.service';
 import { LoggerModule } from './core/logger/logger.module';
 import { SwaggerModule } from './core/swagger/swagger.module';
-import { AgentModule } from './resources/agent/agent.module';
+import { AgentModule } from './resources/agents/agent/agent.module';
 import { UserCoreModule } from './resources/user/user.core.module';
 
 @Module({

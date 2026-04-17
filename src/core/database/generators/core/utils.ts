@@ -361,7 +361,7 @@ export class DatabaseGeneratorUtils {
     static findFileRecursive(startPath: string, targetFile: string): string | null {
         if (!startPath || !targetFile) return null;
 
-        const resolvedStart = `${path.resolve(startPath)}/${targetFile.split('.')[0]}`;
+        const resolvedStart = path.resolve(startPath);
         try {
             if (!fs.existsSync(resolvedStart)) {
                 return null;
@@ -369,19 +369,18 @@ export class DatabaseGeneratorUtils {
 
             const stat = fs.statSync(resolvedStart);
             if (!stat.isDirectory()) {
-                return null;
+                return stat.isFile() && path.basename(resolvedStart) === targetFile ? resolvedStart : null;
             }
 
             const entries = fs.readdirSync(resolvedStart, { withFileTypes: true });
             for (const entry of entries) {
-                if (entry.isFile() && entry.name === targetFile) {
-                    return path.resolve(resolvedStart, entry.name);
-                }
-            }
+                const fullPath = path.join(resolvedStart, entry.name);
 
-            for (const entry of entries) {
+                if (entry.isFile() && entry.name === targetFile) {
+                    return fullPath;
+                }
+
                 if (entry.isDirectory()) {
-                    const fullPath = path.join(resolvedStart, entry.name);
                     const result = this.findFileRecursive(fullPath, targetFile);
                     if (result) return result;
                 }
